@@ -7,6 +7,7 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), nullable=True)
+    role = db.Column(db.String(100), nullable=True, default='user')
     
     def __str__(self):
         return f'{self.username}'

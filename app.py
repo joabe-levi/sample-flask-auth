@@ -1,13 +1,16 @@
+import bcrypt
 from flask import Flask, jsonify, request
 from database import db
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
+
 # Precisa fazer o import do User pra migrar o banco
 from models.user import User
 
 app = Flask(__name__)
 
 app.config['SECRET_KEY'] = 'mysecretkey'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud'
+
 login_manager = LoginManager()
 db.init_app(app)
 login_manager.init_app(app)
@@ -28,7 +31,7 @@ def login():
     if username and password:
         user = User.query.filter_by(username=username).first()
         
-        if user and user.password == password:
+        if user and bcrypt.checkpw(str.encode(password), str.encode(user.password)):
             login_user(user)
             print(current_user.is_authenticated)
                 
@@ -57,7 +60,9 @@ def create_user():
     if not username or not password:
         return jsonify({'message': 'Missing username or password'}), 400
     
-    user = User(username=username, password=password, email=email)
+    hashed_pw = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+    
+    user = User(username=username, password=hashed_pw, email=email, role='user')
     user.save()
     
     return jsonify({'message': 'Success'}), 200
@@ -81,6 +86,9 @@ def update_user(id):
     if not user:
         return jsonify({'message': 'User not found'}), 404
     
+    if id != current_user.id and current_user.role == 'user':
+        return jsonify({'message': "You can't update another user"}), 403
+    
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -98,6 +106,9 @@ def update_user(id):
 @login_required
 def delete_user(id):
     user = User.query.get(id)
+    
+    if current_user.role != 'admin':
+        return jsonify({'message': "You can't delete another user"}), 403
     
     if user and user == current_user:
         return jsonify({'message': "You can't delete yourself"}), 400
